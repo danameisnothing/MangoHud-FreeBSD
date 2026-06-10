@@ -2,7 +2,7 @@
 
 #include <imgui.h>
 
-#ifdef __linux__
+#if defined(__linux__) || defined(__FreeBSD__)
 #include <implot.h>
 #endif
 

@@ -21,7 +21,7 @@ class WineSync {
         bool inside_wine = true;
     public:
         void determine_sync_variant() {
-#ifdef __linux__
+#if defined(__linux__) || defined(__FreeBSD__)
             // check that's were inside wine
             std::string wineProcess = get_exe_path();
             auto n = wineProcess.find_last_of('/');

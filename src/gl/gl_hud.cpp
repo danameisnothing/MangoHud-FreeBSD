@@ -8,7 +8,7 @@
 #include <unistd.h>
 #include <spdlog/spdlog.h>
 #include <imgui.h>
-#ifdef __linux__
+#if defined(__linux__) || defined(__FreeBSD__)
 #include <implot.h>
 #endif
 #include "imgui_utils.h"

@@ -2,7 +2,7 @@
 #include <fcntl.h>
 #include <unistd.h>
 #include <cstring>
-#ifdef __linux__
+#if defined(__linux__) || defined(__FreeBSD__)
 #include <sys/wait.h>
 #endif
 #include <string>
@@ -18,7 +18,7 @@ private:
     struct stat stat_buffer;
     bool runtime = false;
 
-#ifdef __linux__
+#if defined(__linux__) || defined(__FreeBSD__)
     void setNonBlocking(int fd) {
         int flags = fcntl(fd, F_GETFL, 0);
         fcntl(fd, F_SETFL, flags | O_NONBLOCK);

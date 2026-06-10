@@ -1,6 +1,7 @@
 #include <spdlog/spdlog.h>
 #include <thread>
-#ifdef __linux__
+// FIXME: this header may not be functional in FreeBSD
+#if defined(__linux__)  || defined(__FreeBSD__)
 #include <sys/sysinfo.h>
 #endif
 #include "amdgpu.h"

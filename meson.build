@@ -43,7 +43,7 @@ pre_args += '-DSPDLOG_ACTIVE_LEVEL=SPDLOG_LEVEL_TRACE'
 
 # TODO: this is very incomplete
 is_unixy = false
-if ['linux', 'cygwin', 'gnu'].contains(host_machine.system())
+if ['linux', 'cygwin', 'gnu', 'freebsd'].contains(host_machine.system())
   pre_args += '-D_GNU_SOURCE'
   pre_args += '-DHAVE_PTHREAD'
   is_unixy = true

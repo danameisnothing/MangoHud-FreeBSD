@@ -20,7 +20,7 @@
 #include <IconsForkAwesome.h>
 #include "version.h"
 #include "blacklist.h"
-#ifdef __linux__
+#if defined(__linux__) || defined(__FreeBSD__)
 #include "implot.h"
 #endif
 #include "amdgpu.h"
@@ -251,7 +251,7 @@ static bool ImGuiTextOverflow(const char* text) {
 }
 // This function is only used in battery and battery is not used in windows builds
 // Battery should probably be reworked to not use this func since nothing else needs it
-#ifdef __linux__
+#if defined(__linux__) || defined(__FreeBSD__)
 static void ImGuiTableSetColumnIndex(int column)
 {
     ImGui::TableSetColumnIndex(std::max(0, std::min(column, ImGui::TableGetColumnCount() - 1)));
@@ -751,7 +751,7 @@ void HudElements::proc_vram() {
 }
 
 void HudElements::ram(){
-#ifdef __linux__
+#if defined(__linux__)  || defined(__FreeBSD__)
     if (HUDElements.params->enabled[OVERLAY_PARAM_ENABLED_ram] ||
         HUDElements.params->enabled[OVERLAY_PARAM_ENABLED_ram_temp]) {
         ImguiNextColumnFirstItem();
@@ -797,7 +797,7 @@ void HudElements::ram(){
 
 void HudElements::procmem()
 {
-#ifdef __linux__
+#if defined(__linux__) || defined(__FreeBSD__)
     const char* unit = nullptr;
 
     if (!HUDElements.params->enabled[OVERLAY_PARAM_ENABLED_procmem])
@@ -1060,7 +1060,7 @@ void HudElements::frame_timing(){
             }
         }
         ImGui::EndChild();
-#ifdef __linux__
+#if defined(__linux__) || defined(__FreeBSD__)
         if (HUDElements.params->enabled[OVERLAY_PARAM_ENABLED_throttling_status_graph] &&
             gpus && gpus->active_gpu() && gpus->active_gpu()->throttling()){
             ImGui::Dummy(ImVec2(0.0f, real_font_size.y / 2));
@@ -1221,7 +1221,7 @@ void HudElements::vkbasalt(){
 }
 
 void HudElements::battery(){
-#ifdef __linux__
+#if defined(__linux__) || defined(__FreeBSD__)
     if (Battery_Stats.batt_count > 0) {
         if (HUDElements.params->enabled[OVERLAY_PARAM_ENABLED_battery]) {
             ImguiNextColumnFirstItem();
@@ -1393,7 +1393,7 @@ void HudElements::gamescope_frame_timing(){
 
 void HudElements::device_battery()
 {
-#ifdef __linux__
+#if defined(__linux__) || defined(__FreeBSD__)
     std::unique_lock<std::mutex> l(device_lock);
     if (!HUDElements.params->device_battery.empty()) {
         if (device_found) {
@@ -1601,7 +1601,7 @@ void HudElements::graphs(){
         HUDElements.min = 0;
         HUDElements.TextColored(HUDElements.colors.engine, "%s", "VRAM");
     }
-#ifdef __linux__
+#if defined(__linux__) || defined(__FreeBSD__)
     if (value == "ram"){
 
         for (auto& it : graph_data){
@@ -1726,7 +1726,7 @@ void HudElements::present_mode() {
 }
 
 void HudElements::network() {
-#ifdef __linux__
+#if defined(__linux__) || defined(__FreeBSD__)
     if (HUDElements.net && HUDElements.net->should_reset)
         HUDElements.net.reset(new Net);
 
@@ -2138,7 +2138,7 @@ void HudElements::legacy_elements(const overlay_params* temp_params){
 }
 
 void HudElements::update_exec(){
-#ifdef __linux__
+#if defined(__linux__) || defined(__FreeBSD__)
     // TODO: exec needs a rewrite using as using fork() is not safe in multithread.
     // We should probably use posix_spawn instead.
     // This currently stalls games using feral launcher.

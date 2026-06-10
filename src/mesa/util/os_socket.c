@@ -7,7 +7,8 @@
 
 #include "os_socket.h"
 
-#if defined(__linux__)
+// https://sourceforge.net/p/predef/wiki/OperatingSystems/
+#if defined(__linux__) || defined(__FreeBSD__)
 
 #include <fcntl.h>
 #include <poll.h>

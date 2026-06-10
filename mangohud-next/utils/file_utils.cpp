@@ -36,7 +36,8 @@ std::string get_basename(const std::string&& path)
     return path;
 }
 
-#ifdef __linux__
+// TODO: check this code more, there could be more incompatibilities here
+#if defined(__linux__) || defined(__FreeBSD__)
 std::vector<std::string> ls(const char* root, const char* prefix, LS_FLAGS flags)
 {
     std::vector<std::string> list;

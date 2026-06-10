@@ -6,7 +6,7 @@
 #include <string.h>
 #include <stdlib.h>
 #include <errno.h>
-#ifdef __linux__
+#if defined(__linux__)  || defined(__FreeBSD__)
 #include <wordexp.h>
 #include <unistd.h>
 #endif

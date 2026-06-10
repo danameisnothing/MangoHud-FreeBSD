@@ -58,7 +58,7 @@
 #endif
 #include "real_dlsym.h"
 #include "file_utils.h"
-#ifdef __linux__
+#if defined(__linux__) || defined(__FreeBSD__)
 #include <dlfcn.h>
 #include "implot.h"
 #endif
@@ -489,7 +489,7 @@ static void snapshot_swapchain_frame(struct swapchain_data *data)
    struct instance_data *instance_data = device_data->instance;
    update_hud_info(data->sw_stats, instance_data->params, device_data->properties.vendorID);
    check_keybinds(instance_data->params);
-#ifdef __linux__
+#if defined(__linux__) || defined(__FreeBSD__)
    if (instance_data->params.control >= 0) {
       control_client_check(instance_data->params.control, instance_data->control_client, gpu.c_str());
       process_control_socket(instance_data->control_client, instance_data->params);
@@ -1655,7 +1655,7 @@ static VkResult overlay_CreateSwapchainKHR(
 
    std::string deviceName = prop.deviceName;
    if (!is_blacklisted()) {
-#ifdef __linux__
+#if defined(__linux__) || defined(__FreeBSD__)
       swapchain_data->sw_stats.gpuName = remove_parentheses(deviceName);
 #endif
    }
@@ -1949,7 +1949,7 @@ static VkResult overlay_CreateDevice(
 
    if (!is_blacklisted()) {
       device_map_queues(device_data, pCreateInfo);
-#ifdef __linux__
+#if defined(__linux__) || defined(__FreeBSD__)
       gpu = device_data->properties.deviceName;
       SPDLOG_DEBUG("gpu: {}", gpu);
 #endif
@@ -2060,7 +2060,7 @@ static VkResult overlay_CreateInstance(
    }
 
    if (!is_blacklisted()) {
-#ifdef __linux__
+#if defined(__linux__) || defined(__FreeBSD__)
       init_system_info();
       instance_data->notifier.params = &instance_data->params;
       start_notifier(instance_data->notifier);
@@ -2125,7 +2125,7 @@ static void overlay_DestroyInstance(
    struct instance_data *instance_data = FIND(struct instance_data, instance);
    instance_data_map_physical_devices(instance_data, false);
    instance_data->vtable.DestroyInstance(instance, pAllocator);
-#ifdef __linux__
+#if defined(__linux__) || defined(__FreeBSD__)
    if (!is_blacklisted())
       stop_notifier(instance_data->notifier);
 #endif

@@ -18,7 +18,7 @@
 #include "mangoapp.h"
 #include "mangoapp_proto.h"
 #include <GLFW/glfw3.h>
-#ifdef __linux__
+#if defined(__linux__) || defined(__FreeBSD__)
 #include "implot.h"
 #endif
 
@@ -262,7 +262,7 @@ static GLFWwindow* init(const char* glsl_version){
     glfwMakeContextCurrent(window);
     glfwSwapInterval(1); // Enable vsync
     ImGui::CreateContext();
-#ifdef __linux__
+#if defined(__linux__) || defined(__FreeBSD__)
     ImPlot::CreateContext();
 #endif
     ImGuiIO& io = ImGui::GetIO(); (void)io;

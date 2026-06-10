@@ -121,10 +121,23 @@ bool CPUStats::Init()
 
     std::string line;
     std::ifstream file (PROCSTATFILE);
-    bool first = true;
+    // FIXME: this is commented out because this method may be done in a hacky way. revisit this later
+    //bool first = true;
     m_cpuData.clear();
 
-    if (!file.is_open()) {
+    std::string total_threads = exec("sysctl kern.cp_times");
+    trim(total_threads);
+    
+    std::vector<std::string> data = split_cpu_why(total_threads, ' ');
+    for (unsigned int i = 0; i < data.size() / 5; i++) {
+        CPUData cpu = {};
+        cpu.totalTime = 1;
+        cpu.totalPeriod = 1;
+        cpu.cpu_id = i;
+        m_cpuData.push_back(cpu);
+    }
+
+    /*if (!file.is_open()) {
         SPDLOG_ERROR("Failed to opening " PROCSTATFILE);
         return false;
     }
@@ -157,7 +170,7 @@ bool CPUStats::Init()
             sscanf(line.c_str(), "btime %lld\n", &m_boottime);
             break;
         }
-    } while(true);
+    } while(true);*/
 
 #ifndef TEST_ONLY
     if (get_params()->enabled[OVERLAY_PARAM_ENABLED_core_type])
@@ -185,7 +198,35 @@ bool CPUStats::UpdateCPUData()
     if (!m_inited)
         return false;
 
-    std::string line;
+    unsigned long long int interrupt;
+    // Some of these entries simply aren't returned by this command, we ignore them for now.
+    std::string total_cpu = exec("sysctl kern.cp_time");
+    trim(total_cpu);
+    if (sscanf(total_cpu.c_str(), "kern.cp_time: %16llu %16llu %16llu %16llu %16llu", &usertime, &nicetime, &systemtime, &interrupt, &idletime) == 5) {
+        irq = interrupt;
+        calculateCPUData(m_cpuDataTotal, usertime, nicetime, systemtime, idletime, ioWait, irq, softIrq, steal, guest, guestnice);
+    }
+
+    std::string total_threads = exec("sysctl kern.cp_times");
+    trim(total_threads);
+    
+    std::vector<std::string> data = split_cpu_why(total_threads, ' ');
+
+    for (unsigned int i = 0; i < m_cpuData.size(); i++) {
+        // i*5 + 1 --- (i+1)*5
+
+        usertime = std::stoull(data.at((i*5)+1));
+        nicetime = std::stoull(data.at((i*5)+2));
+        systemtime = std::stoull(data.at((i*5)+3));
+        irq = std::stoull(data.at((i*5)+4));
+        idletime = std::stoull(data.at((i*5)+5));
+
+        CPUData& cpuData = m_cpuData[i];
+        calculateCPUData(cpuData, usertime, nicetime, systemtime, idletime, ioWait, irq, softIrq, steal, guest, guestnice);
+    }
+    bool ret = true;
+    // FIXME: this is commented out because this method may be done in a hacky way. revisit this later
+    /*std::string line;
     std::ifstream file (PROCSTATFILE);
     bool ret = false;
 
@@ -211,7 +252,7 @@ bool CPUStats::UpdateCPUData()
                 return false;
             }
 
-            if (cpuid < 0 /* can it? */) {
+            if (cpuid < 0 /* can it? *//*) {
                 SPDLOG_DEBUG("Cpu id '{}' is out of bounds", cpuid);
                 return false;
             }
@@ -232,7 +273,7 @@ bool CPUStats::UpdateCPUData()
     } while(true);
 
     if (cpu_count < m_cpuData.size())
-        m_cpuData.resize(cpu_count);
+        m_cpuData.resize(cpu_count);*/
 
     m_cpuPeriod = (double)m_cpuData[0].totalPeriod / m_cpuData.size();
     m_updatedCPUs = true;
@@ -241,7 +282,8 @@ bool CPUStats::UpdateCPUData()
 
 bool CPUStats::UpdateCoreMhz() {
     m_coreMhz.clear();
-    FILE *fp;
+    // FIXME: this is commented out because my current method relies on an external privileged program running turbostat to extract CPU clock. there are no good ways to easily integrate this without giving MangoHud privileged access
+    /*FILE *fp;
     static bool scaling_freq = true;
     if (scaling_freq){
         for (auto& cpu : m_cpuData){
@@ -270,7 +312,7 @@ bool CPUStats::UpdateCoreMhz() {
                 i++;
             }
         }
-    }
+    }*/
 
     m_cpuDataTotal.cpu_mhz = 0;
     for (auto data : m_cpuData)
@@ -281,7 +323,8 @@ bool CPUStats::UpdateCoreMhz() {
 }
 
 bool CPUStats::ReadcpuTempFile(int& temp) {
-	if (!m_cpuTempFile)
+    // FIXME: this is commented out because this method is sub-optimal. it relies on executing a new process, which might introduce delays!
+	/*if (!m_cpuTempFile)
 		return false;
 
 	rewind(m_cpuTempFile);
@@ -289,7 +332,20 @@ bool CPUStats::ReadcpuTempFile(int& temp) {
 	bool ret = (fscanf(m_cpuTempFile, "%d", &temp) == 1);
 	temp = temp / 1000;
 
-	return ret;
+	return ret;*/
+    // this function doesn't pipe stderr by default?
+    /*std::string cpu_0_temp = exec("sysctl dev.cpu.0.temperature 2>&1");
+    // https://stackoverflow.com/a/2340309
+    if (cpu_0_temp.find("sysctl: unknown oid") != std::string::npos) {
+        SPDLOG_ERROR("*BSD: can't fetch first CPU thread temperature, make sure kernel modules for exposing CPU temps are loaded (coretemp for Intel, amdtemp for AMD)");
+        return false;
+    }
+
+    // this string has a trailing "C" in it, e.g. 46.0C
+    // my hacky function buh, TODO; implement
+    std::string first_temp_c = split_cpu_why(cpu_0_temp, ' ').at(1);
+    temp = std::stoi(first_temp_c.substr(0, first_temp_c.length() - 1));
+    return true;*/
 }
 
 bool CPUStats::UpdateCpuTemp() {
@@ -562,7 +618,8 @@ bool CPUStats::GetCpuFile() {
     if (m_cpuTempFile)
         return true;
 
-    std::string name, path, input;
+    // TODO: bruh
+    /*std::string name, path, input;
     std::string hwmon = "/sys/class/hwmon/";
     std::smatch match;
 
@@ -571,6 +628,7 @@ bool CPUStats::GetCpuFile() {
         path = hwmon + dir;
         name = read_line(path + "/name");
         SPDLOG_DEBUG("hwmon: sensor name: {}", name);
+        // TODO: add sysctl dev.cpu.0.temperature and more, this requires kldload amdtemp!
 
         std::map<std::string, std::string> custom_sensor = get_params()->cpu_custom_temp_sensor;
 
@@ -634,7 +692,7 @@ bool CPUStats::GetCpuFile() {
     }
 
     SPDLOG_INFO("hwmon: using input: {}", input);
-    m_cpuTempFile = fopen(input.c_str(), "r");
+    m_cpuTempFile = fopen(input.c_str(), "r");*/
 
     return true;
 }

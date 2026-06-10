@@ -14,7 +14,7 @@
 GPUS::GPUS() {
     std::set<std::string> gpu_entries;
 
-    for (const auto& entry : fs::directory_iterator("/sys/class/drm")) {
+    for (const auto& entry : fs::directory_iterator("/dev/dri")) {
         if (!entry.is_directory())
             continue;
 
@@ -34,7 +34,7 @@ GPUS::GPUS() {
     uint8_t /*idx = 0,*/ total_active = 0;
 
     for (const auto& drm_node : gpu_entries) {
-        const std::string path = "/sys/class/drm/" + drm_node;
+        const std::string path = "/dev/dri/" + drm_node;
         const std::string driver = get_driver(path);
 
          {

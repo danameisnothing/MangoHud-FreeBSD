@@ -36,7 +36,8 @@ std::string get_basename(const std::string&& path)
     return path;
 }
 
-#ifdef __linux__
+// TODO: check this code more, there could be more incompatibilities here
+#if defined(__linux__) || defined(__FreeBSD__)
 std::vector<std::string> ls(const char* root, const char* prefix, LS_FLAGS flags)
 {
     std::vector<std::string> list;
@@ -188,8 +189,9 @@ std::string get_config_dir()
 bool lib_loaded(const std::string& lib, pid_t pid) {
 
    std::string who = pid != -1 ? std::to_string(pid) : "self";
+   // TODO: is this incomplete? why only second /proc gets modified?
    auto paths = { fs::path("/proc") / who / "map_files",
-            fs::path("/proc") / who / "fd" };
+            fs::path("/dev") / "fd" };
     for (auto& path : paths) {
         if (dir_exists(path.string())) {
             for (auto& p : fs::directory_iterator(path)) {

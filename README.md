@@ -39,7 +39,7 @@ A Vulkan and OpenGL overlay for monitoring FPS, temperatures, CPU/GPU load and m
 If you wish to compile MangoHud to keep up to date with any changes - first clone this repository and cd into it:
 
 ```
-git clone --recurse-submodules https://github.com/flightlessmango/MangoHud.git
+git clone --recurse-submodules https://github.com/danameisnothing/MangoHud-FreeBSD.git
 cd MangoHud
 ```
 

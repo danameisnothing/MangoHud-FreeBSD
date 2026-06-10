@@ -29,7 +29,7 @@
 #include "fex.h"
 #include "ftrace.h"
 
-#ifdef __linux__
+#if defined(__linux__) || defined(__FreeBSD__)
 #include <libgen.h>
 #include <unistd.h>
 #endif
@@ -107,7 +107,7 @@ void update_hw_info(const struct overlay_params& params, uint32_t vendorID)
    if (real_params->enabled[OVERLAY_PARAM_ENABLED_cpu_stats] || logger->is_active()) {
       cpuStats.UpdateCPUData();
 
-#ifdef __linux__
+#if defined(__linux__) || defined(__FreeBSD__)
       if (real_params->enabled[OVERLAY_PARAM_ENABLED_core_load] || real_params->enabled[OVERLAY_PARAM_ENABLED_cpu_mhz] || logger->is_active())
          cpuStats.UpdateCoreMhz();
       if (real_params->enabled[OVERLAY_PARAM_ENABLED_cpu_temp] || logger->is_active() || real_params->enabled[OVERLAY_PARAM_ENABLED_graphs])
@@ -121,7 +121,7 @@ void update_hw_info(const struct overlay_params& params, uint32_t vendorID)
          gpus->get_metrics();
    }
 
-#ifdef __linux__
+#if defined(__linux__) || defined(__FreeBSD__)
    if (real_params->enabled[OVERLAY_PARAM_ENABLED_battery])
       Battery_Stats.update();
    if (!real_params->device_battery.empty()) {
@@ -147,7 +147,7 @@ void update_hw_info(const struct overlay_params& params, uint32_t vendorID)
       currentLogData.gpu_vram_used = gpus->active_gpu()->metrics.sys_vram_used;
       currentLogData.gpu_power = gpus->active_gpu()->metrics.powerUsage;
    }
-#ifdef __linux__
+#if defined(__linux__) || defined(__FreeBSD__)
    currentLogData.ram_used = memused;
    currentLogData.swap_used = swapused;
    currentLogData.process_rss = proc_mem_resident / float((2 << 29)); // GiB, consistent w/ other mem stats
@@ -241,7 +241,7 @@ void update_hud_info_with_frametime(struct swapchain_stats& sw_stats, const stru
       frametime_data.push_back(frametime_ms);
       frametime_data.erase(frametime_data.begin());
    }
-#ifdef __linux__
+#if defined(__linux__) || defined(__FreeBSD__)
    if (gpus)
       gpus->update_throttling();
 #endif
@@ -265,7 +265,7 @@ void update_hud_info_with_frametime(struct swapchain_stats& sw_stats, const stru
       hw_update_thread->update(&params, vendorID);
 
       if (fpsmetrics) fpsmetrics->update_thread();
-#ifdef __linux__
+#if defined(__linux__) || defined(__FreeBSD__)
       if (HUDElements.net) HUDElements.net->update();
 #endif
 
@@ -746,7 +746,7 @@ void render_imgui(swapchain_stats& data, struct overlay_params& params, ImVec2& 
 
 void init_cpu_stats(overlay_params& params)
 {
-#ifdef __linux__
+#if defined(__linux__) || defined(__FreeBSD__)
    auto& enabled = params.enabled;
    enabled[OVERLAY_PARAM_ENABLED_cpu_stats] = cpuStats.Init()
                            && enabled[OVERLAY_PARAM_ENABLED_cpu_stats];
@@ -762,7 +762,7 @@ struct pci_bus {
    int func;
 };
 
-#ifdef __linux__
+#if defined(__linux__) || defined(__FreeBSD__)
 static void parse_proton_version(std::string wineProcess, std::string postfix)
 {
    stringstream ss;
@@ -787,7 +787,7 @@ static void parse_proton_version(std::string wineProcess, std::string postfix)
 #endif
 
 void init_system_info(){
-   #ifdef __linux__
+   #if defined(__linux__) || defined(__FreeBSD__)
       const char* ld_preload = getenv("LD_PRELOAD");
       if (ld_preload)
          unsetenv("LD_PRELOAD");
@@ -867,7 +867,7 @@ void init_system_info(){
 }
 
 void check_for_vkbasalt_and_gamemode() {
-#ifdef __linux__
+#if defined(__linux__) || defined(__FreeBSD__)
    static bool checked = false;
    if (checked)
       return;
