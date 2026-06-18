@@ -10,11 +10,29 @@
 #include "file_utils.h"
 #include "hud_elements.h"
 
+#include "logging.h"
+
 float memused, memmax, swapused;
 int mem_temp;
 uint64_t proc_mem_resident, proc_mem_shared, proc_mem_virt;
 
 void update_meminfo() {
+#ifdef __FreeBSD__
+    const float divisor = 1024.f * 1024.f;
+    // https://www.cyberciti.biz/faq/freebsd-command-to-get-ram-information/
+    // https://github.com/ocochard/myscripts/blob/master/FreeBSD/freebsd-memory.sh
+    // https://wiki.freebsd.org/sysctl
+    std::string mem_total = exec("sysctl hw.physmem 2>&1");
+    std::string mem_avail = exec("sysctl hw.usermem 2>&1");
+    // https://forums.freebsd.org/threads/how-to-find-used-swap.23876/
+    std::string swap_total = exec("sysctl vm.swap_total 2>&1");
+    std::string swap_used = exec("sysctl vm.swap_used 2>&1");
+
+    memmax = std::stoull(mem_total) / divisor;
+    memused = (std::stoull(mem_total) - std::stoull(mem_avail)) / divisor;
+    // FIXME: get proper free / used swap space
+    swapused = 0.f;
+#elif
     std::ifstream file("/proc/meminfo");
     std::map<std::string, float> meminfo;
 
@@ -32,6 +50,7 @@ void update_meminfo() {
     memmax = meminfo["MemTotal"];
     memused = meminfo["MemTotal"] - meminfo["MemAvailable"];
     swapused = meminfo["SwapTotal"] - meminfo["SwapFree"];
+#endif
 }
 
 void update_mem_temp() {

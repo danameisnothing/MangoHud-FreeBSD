@@ -12,6 +12,8 @@ Rebuild :
 CC=gcc CXX=g++ meson setup --reconfigure build -Dwith_nvml=enabled -Dwith_xnvctrl=disabled -Dwith_x11=enabled -Dwith_wayland=disabled -Dwith_dbus=enabled -Dwith_mangohud_next=false
 ```
 
+Note that some monitoring tools may not be loaded into the kernel by default. For example, CPU temperature monitoring requires loading the `amdtemp` or `coretemp` kernel modules for AMD and Intel CPUs respectively.
+
 On finish, you may encounter a message : `ld-elf.so.1: Cannot open "/usr/local/$LIB/mangohud/libMangoHud_shim.so"`
 Open up the `mangohud` shell script on PATH, and replace `\$LIB` with `lib` or `lib32`, depending on your arch.
 

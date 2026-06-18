@@ -110,10 +110,12 @@ CPUStats::CPUStats()
 
 CPUStats::~CPUStats()
 {
+#ifndef __FreeBSD__
     if (m_cpuTempFile) {
         fclose(m_cpuTempFile);
         m_cpuTempFile = nullptr;
     }
+#endif
 }
 
 bool CPUStats::Init()
@@ -121,6 +123,22 @@ bool CPUStats::Init()
     if (m_inited)
         return true;
 
+#ifdef __FreeBSD__
+    std::string total_threads = exec("sysctl kern.cp_times | sed -n 's/kern.cp_times: //p'");
+    // https://www.geeksforgeeks.org/cpp/how-to-split-string-by-delimiter-in-cpp/
+    std::stringstream ss(total_threads);
+    std::string tok;
+    unsigned int cnt = 0;
+    while (std::getline(ss, tok, ' ')) cnt++;
+    // I forgot what the 5 is for, this is based from my hasty attempt of FreeBSD porting 6 months ago
+    for (unsigned int i = 0; i < cnt / 5; i++) {
+        CPUData cpu = {};
+        cpu.totalTime = 1;
+        cpu.totalPeriod = 1;
+        cpu.cpu_id = i;
+        m_cpuData.push_back(cpu);
+    }
+#else
     std::string line;
     std::ifstream file (PROCSTATFILE);
     bool first = true;
@@ -160,6 +178,7 @@ bool CPUStats::Init()
             break;
         }
     } while(true);
+#endif
 
 #ifndef TEST_ONLY
     if (get_params()->enabled[OVERLAY_PARAM_ENABLED_core_type])
@@ -179,14 +198,50 @@ bool CPUStats::Reinit()
 //TODO take sampling interval into account?
 bool CPUStats::UpdateCPUData()
 {
-    unsigned long long int usertime, nicetime, systemtime, idletime;
-    unsigned long long int ioWait, irq, softIrq, steal, guest, guestnice;
+    // FIXME: INCOMPLETE HACK!
+    unsigned long long int usertime = 0, nicetime = 0, systemtime = 0, idletime = 0;
+    unsigned long long int ioWait = 0, irq = 0, softIrq = 0, steal = 0, guest = 0, guestnice = 0;
     int cpuid = -1;
     size_t cpu_count = 0;
 
     if (!m_inited)
         return false;
 
+#ifdef __FreeBSD__
+    unsigned long long int interrupt = 0;
+    // Some of these entries simply aren't returned by this command, we ignore them for now.
+    std::string total_cpu = exec("sysctl kern.cp_time");
+    trim(total_cpu);
+    if (sscanf(total_cpu.c_str(), "kern.cp_time: %16llu %16llu %16llu %16llu %16llu", &usertime, &nicetime, &systemtime, &interrupt, &idletime) == 5) {
+        irq = interrupt;
+        calculateCPUData(m_cpuDataTotal, usertime, nicetime, systemtime, idletime, ioWait, irq, softIrq, steal, guest, guestnice);
+    }
+
+    std::string total_threads = exec("sysctl kern.cp_times");
+    trim(total_threads);
+
+    // https://www.geeksforgeeks.org/cpp/how-to-split-string-by-delimiter-in-cpp/
+    std::stringstream ss(total_threads);
+    std::string tok;
+    std::vector<std::string> data;
+    while (std::getline(ss, tok, ' ')) {
+        data.push_back(tok);
+    }
+
+    for (unsigned int i = 0; i < m_cpuData.size(); i++) {
+        // i*5 + 1 --- (i+1)*5
+
+        usertime = std::stoull(data.at((i*5)+1));
+        nicetime = std::stoull(data.at((i*5)+2));
+        systemtime = std::stoull(data.at((i*5)+3));
+        irq = std::stoull(data.at((i*5)+4));
+        idletime = std::stoull(data.at((i*5)+5));
+
+        CPUData& cpuData = m_cpuData[i];
+        calculateCPUData(cpuData, usertime, nicetime, systemtime, idletime, ioWait, irq, softIrq, steal, guest, guestnice);
+    }
+    return true;
+#else
     std::string line;
     std::ifstream file (PROCSTATFILE);
     bool ret = false;
@@ -239,12 +294,15 @@ bool CPUStats::UpdateCPUData()
     m_cpuPeriod = (double)m_cpuData[0].totalPeriod / m_cpuData.size();
     m_updatedCPUs = true;
     return ret;
+#endif
 }
 
 bool CPUStats::UpdateCoreMhz() {
     m_coreMhz.clear();
+    // Unfortunately, I haven't found any way to get the real CPU clock speed, without a program running with elevated privileges (Turbostat)
     // FIXME: this is commented out because my current method relies on an external privileged program running turbostat to extract CPU clock. there are no good ways to easily integrate this without giving MangoHud privileged access
-    /*FILE *fp;
+#ifndef __FreeBSD__
+    FILE *fp;
     static bool scaling_freq = true;
     if (scaling_freq){
         for (auto& cpu : m_cpuData){
@@ -273,7 +331,8 @@ bool CPUStats::UpdateCoreMhz() {
                 i++;
             }
         }
-    }*/
+    }
+#endif
 
     m_cpuDataTotal.cpu_mhz = 0;
     for (auto data : m_cpuData)
@@ -284,18 +343,9 @@ bool CPUStats::UpdateCoreMhz() {
 }
 
 bool CPUStats::ReadcpuTempFile(int& temp) {
-    // FIXME: this is commented out because this method is sub-optimal. it relies on executing a new process, which might introduce delays!
-	/*if (!m_cpuTempFile)
-		return false;
-
-	rewind(m_cpuTempFile);
-	fflush(m_cpuTempFile);
-	bool ret = (fscanf(m_cpuTempFile, "%d", &temp) == 1);
-	temp = temp / 1000;
-
-	return ret;*/
+#ifdef __FreeBSD__
     // this function doesn't pipe stderr by default?
-    /*std::string cpu_0_temp = exec("sysctl dev.cpu.0.temperature 2>&1");
+    std::string cpu_0_temp = exec("sysctl dev.cpu.0.temperature 2>&1 | sed \"s/dev.cpu.0.temperature: //g\"");
     // https://stackoverflow.com/a/2340309
     if (cpu_0_temp.find("sysctl: unknown oid") != std::string::npos) {
         SPDLOG_ERROR("*BSD: can't fetch first CPU thread temperature, make sure kernel modules for exposing CPU temps are loaded (coretemp for Intel, amdtemp for AMD)");
@@ -303,10 +353,19 @@ bool CPUStats::ReadcpuTempFile(int& temp) {
     }
 
     // this string has a trailing "C" in it, e.g. 46.0C
-    // my hacky function buh, TODO; implement
-    std::string first_temp_c = split_cpu_why(cpu_0_temp, ' ').at(1);
-    temp = std::stoi(first_temp_c.substr(0, first_temp_c.length() - 1));*/
+    temp = std::stoi(cpu_0_temp.substr(0, cpu_0_temp.length() - 1));
     return true;
+#else
+    if (!m_cpuTempFile)
+		return false;
+
+	rewind(m_cpuTempFile);
+	fflush(m_cpuTempFile);
+	bool ret = (fscanf(m_cpuTempFile, "%d", &temp) == 1);
+	temp = temp / 1000;
+
+	return ret;
+#endif
 }
 
 bool CPUStats::UpdateCpuTemp() {
@@ -320,6 +379,7 @@ bool CPUStats::UpdateCpuTemp() {
     }
 
     int temp = 0;
+    SPDLOG_DEBUG("hit branch for updating CPU temp");
     bool ret = ReadcpuTempFile(temp);
     m_cpuDataTotal.temp = temp;
 
@@ -579,8 +639,11 @@ bool CPUStats::GetCpuFile() {
     if (m_cpuTempFile)
         return true;
 
-    // TODO: bruh
-    /*std::string name, path, input;
+    // since FreeBSD doesn't have /sys/class/hwmon, we don't bother lol
+#ifdef __FreeBSD__
+    return true;
+#else
+    std::string name, path, input;
     std::string hwmon = "/sys/class/hwmon/";
     std::smatch match;
 
@@ -653,9 +716,10 @@ bool CPUStats::GetCpuFile() {
     }
 
     SPDLOG_INFO("hwmon: using input: {}", input);
-    m_cpuTempFile = fopen(input.c_str(), "r");*/
+    m_cpuTempFile = fopen(input.c_str(), "r");
 
     return true;
+#endif
 }
 
 static CPUPowerData_k10temp* init_cpu_power_data_k10temp(const std::string path) {

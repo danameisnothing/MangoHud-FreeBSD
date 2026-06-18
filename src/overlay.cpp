@@ -792,10 +792,15 @@ void init_system_info(){
       if (ld_preload)
          unsetenv("LD_PRELOAD");
 
+#ifdef __FreeBSD__
+      ram = exec("sysctl hw.physmem | sed -n 's/^hw.physmem: *\\([0-9]*\\).*/\\1/p'");
+      cpu = exec("sysctl hw.model | sed -n 's/^hw.model.*: \\(.*\\)/\\1/p' | sed 's/([^)]*)//g'");
+#else
       ram =  exec("sed -n 's/^MemTotal: *\\([0-9]*\\).*/\\1/p' /proc/meminfo");
       trim(ram);
       cpu =  exec("sed -n 's/^model name.*: \\(.*\\)/\\1/p' /proc/cpuinfo | sed 's/([^)]*)//g' | tail -n1");
       trim(cpu);
+#endif
       kernel = exec("uname -r");
       trim(kernel);
       os = exec("sed -n 's/PRETTY_NAME=\\(.*\\)/\\1/p' /etc/os-release");

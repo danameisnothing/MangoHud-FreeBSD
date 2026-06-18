@@ -120,7 +120,7 @@ static void loadMangoHud() {
 
     if (!mangoHudLoaded)
     {
-        // absolute nasty hack, this doesn't even account for lib and lib32 arches
+        // HACKHACK: absolute nasty hack, this doesn't even account for lib and lib32 arches
 #ifdef __FreeBSD__
         const char* pth = "/usr/local/lib/mangohud/libMangoHud_opengl.so";   
 #elif
