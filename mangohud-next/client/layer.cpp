@@ -240,6 +240,23 @@ public:
         uint32_t imageIndex = pPresentInfo->pImageIndices[0];
         VkPresentInfoKHR pi = *pPresentInfo;
 
+        if (pPresentInfo->swapchainCount > 1) {
+            SPDLOG_DEBUG("QueuePresentKHR has {} swapchains; drawing overlay on index 0 and forwarding all swapchains",
+                         pPresentInfo->swapchainCount);
+            std::lock_guard lock(layer->swapchain_mtx);
+            for (uint32_t i = 0; i < pPresentInfo->swapchainCount; i++) {
+                auto it = layer->swapchains.find(pPresentInfo->pSwapchains[i]);
+                if (it != layer->swapchains.end()) {
+                    SPDLOG_DEBUG("QueuePresentKHR swapchain[{}]=0x{:x} image={} size={}x{}",
+                                 i, (uint64_t)pPresentInfo->pSwapchains[i], pPresentInfo->pImageIndices[i],
+                                 it->second->extent.width, it->second->extent.height);
+                } else {
+                    SPDLOG_DEBUG("QueuePresentKHR swapchain[{}]=0x{:x} image={} size=unknown",
+                                 i, (uint64_t)pPresentInfo->pSwapchains[i], pPresentInfo->pImageIndices[i]);
+                }
+            }
+        }
+
         if (!fps_limiter)
             fps_limiter = std::make_unique<fpsLimiter>(false);
 
@@ -379,7 +396,7 @@ public:
             fps_limiter = std::make_unique<fpsLimiter>(false);
 
         VkResult r = pDispatch->AcquireNextImageKHR(device, swapchain, timeout, semaphore, fence, pImageIndex);
-        if (r == VK_SUCCESS)
+        if (r == VK_SUCCESS || r == VK_SUBOPTIMAL_KHR)
             fps_limiter->limit(false);
 
         return r;
@@ -392,7 +409,7 @@ public:
             fps_limiter = std::make_unique<fpsLimiter>(false);
 
         VkResult r = pDispatch->AcquireNextImage2KHR(device, pAcquireInfo, pImageIndex);
-        if (r == VK_SUCCESS)
+        if (r == VK_SUCCESS || r == VK_SUBOPTIMAL_KHR)
             fps_limiter->limit(false);
 
         return r;
