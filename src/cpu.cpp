@@ -13,6 +13,8 @@
 #include "string_utils.h"
 #include "gpu.h"
 #include "hud_elements.h"
+// why is this not in by default?
+#include "logging.h"
 
 #ifndef TEST_ONLY
 #include "hud_elements.h"
@@ -121,23 +123,10 @@ bool CPUStats::Init()
 
     std::string line;
     std::ifstream file (PROCSTATFILE);
-    // FIXME: this is commented out because this method may be done in a hacky way. revisit this later
-    //bool first = true;
+    bool first = true;
     m_cpuData.clear();
 
-    std::string total_threads = exec("sysctl kern.cp_times");
-    trim(total_threads);
-    
-    std::vector<std::string> data = split_cpu_why(total_threads, ' ');
-    for (unsigned int i = 0; i < data.size() / 5; i++) {
-        CPUData cpu = {};
-        cpu.totalTime = 1;
-        cpu.totalPeriod = 1;
-        cpu.cpu_id = i;
-        m_cpuData.push_back(cpu);
-    }
-
-    /*if (!file.is_open()) {
+    if (!file.is_open()) {
         SPDLOG_ERROR("Failed to opening " PROCSTATFILE);
         return false;
     }
@@ -170,7 +159,7 @@ bool CPUStats::Init()
             sscanf(line.c_str(), "btime %lld\n", &m_boottime);
             break;
         }
-    } while(true);*/
+    } while(true);
 
 #ifndef TEST_ONLY
     if (get_params()->enabled[OVERLAY_PARAM_ENABLED_core_type])
@@ -198,35 +187,7 @@ bool CPUStats::UpdateCPUData()
     if (!m_inited)
         return false;
 
-    unsigned long long int interrupt;
-    // Some of these entries simply aren't returned by this command, we ignore them for now.
-    std::string total_cpu = exec("sysctl kern.cp_time");
-    trim(total_cpu);
-    if (sscanf(total_cpu.c_str(), "kern.cp_time: %16llu %16llu %16llu %16llu %16llu", &usertime, &nicetime, &systemtime, &interrupt, &idletime) == 5) {
-        irq = interrupt;
-        calculateCPUData(m_cpuDataTotal, usertime, nicetime, systemtime, idletime, ioWait, irq, softIrq, steal, guest, guestnice);
-    }
-
-    std::string total_threads = exec("sysctl kern.cp_times");
-    trim(total_threads);
-    
-    std::vector<std::string> data = split_cpu_why(total_threads, ' ');
-
-    for (unsigned int i = 0; i < m_cpuData.size(); i++) {
-        // i*5 + 1 --- (i+1)*5
-
-        usertime = std::stoull(data.at((i*5)+1));
-        nicetime = std::stoull(data.at((i*5)+2));
-        systemtime = std::stoull(data.at((i*5)+3));
-        irq = std::stoull(data.at((i*5)+4));
-        idletime = std::stoull(data.at((i*5)+5));
-
-        CPUData& cpuData = m_cpuData[i];
-        calculateCPUData(cpuData, usertime, nicetime, systemtime, idletime, ioWait, irq, softIrq, steal, guest, guestnice);
-    }
-    bool ret = true;
-    // FIXME: this is commented out because this method may be done in a hacky way. revisit this later
-    /*std::string line;
+    std::string line;
     std::ifstream file (PROCSTATFILE);
     bool ret = false;
 
@@ -252,7 +213,7 @@ bool CPUStats::UpdateCPUData()
                 return false;
             }
 
-            if (cpuid < 0 /* can it? *//*) {
+            if (cpuid < 0 /* can it? */) {
                 SPDLOG_DEBUG("Cpu id '{}' is out of bounds", cpuid);
                 return false;
             }
@@ -273,7 +234,7 @@ bool CPUStats::UpdateCPUData()
     } while(true);
 
     if (cpu_count < m_cpuData.size())
-        m_cpuData.resize(cpu_count);*/
+        m_cpuData.resize(cpu_count);
 
     m_cpuPeriod = (double)m_cpuData[0].totalPeriod / m_cpuData.size();
     m_updatedCPUs = true;
@@ -344,8 +305,8 @@ bool CPUStats::ReadcpuTempFile(int& temp) {
     // this string has a trailing "C" in it, e.g. 46.0C
     // my hacky function buh, TODO; implement
     std::string first_temp_c = split_cpu_why(cpu_0_temp, ' ').at(1);
-    temp = std::stoi(first_temp_c.substr(0, first_temp_c.length() - 1));
-    return true;*/
+    temp = std::stoi(first_temp_c.substr(0, first_temp_c.length() - 1));*/
+    return true;
 }
 
 bool CPUStats::UpdateCpuTemp() {

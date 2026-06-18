@@ -45,8 +45,12 @@ subprojects/spdlog-*/
 subprojects/nlohmann_json-*/
 subprojects/implot-*/
 subprojects/cmocka/
+subprojects/vk-bootstrap
+subprojects/vkroots
 
 #GNU Global Metadata
 **/GPATH
 **/GRTAGS
 **/GTAGS
+
+.wraplock

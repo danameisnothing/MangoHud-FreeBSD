@@ -4,11 +4,21 @@
 
 namespace fs = ghc::filesystem;
 
+#ifdef __FreeBSD__
+    static const std::string basepth = "/dev/";
+#else
+    static const std::string basepth = "/sys/class/drm";
+#endif
+
+
 GPUS::GPUS(const overlay_params* early_params) {
     std::set<std::string> gpu_entries;
     auto params = early_params ? early_params : get_params().get();
 
-    for (const auto& entry : fs::directory_iterator("/sys/class/drm")) {
+    // HACKHACK: FALLBACK! My system doesn't have /dev/dri!
+    //if (fs::is_directory(basepth))
+
+    for (const auto& entry : fs::directory_iterator(basepth)) {
         if (!entry.is_directory())
             continue;
 
@@ -48,7 +58,7 @@ GPUS::GPUS(const overlay_params* early_params) {
             }
         }
 
-        std::string path = "/sys/class/drm/" + node_name;
+        std::string path = basepth + "/" + node_name;
         std::string device_address = get_pci_device_address(path);  // Store the result
         const char* pci_dev = device_address.c_str();
 
@@ -115,7 +125,7 @@ GPUS::GPUS(const overlay_params* early_params) {
 }
 
 std::string GPUS::get_driver(const std::string& node) {
-    std::string path = "/sys/class/drm/" + node + "/device/driver";
+    std::string path = basepth + "/" + node + "/device/driver";
 
     if (!fs::exists(path)) {
         SPDLOG_ERROR("{} doesn't exist", path);

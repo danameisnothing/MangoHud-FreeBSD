@@ -183,11 +183,13 @@ endif
 vkh_sp = subproject('vulkan-headers')
 vk_api_xml = vkh_sp.get_variable('vulkan_api_xml')
 vulkan_headers_dep = vkh_sp.get_variable('vulkan_headers_dep')
-vulkan_lib = cc.find_library('vulkan', required: true)
+# not sure, I commented this out together with Raptor mini. it seems to work enough. it could just be my env being broken though
+#vulkan_lib = cc.find_library('vulkan', required: true)
+vulkan_lib = dependency('vulkan', required: true)
 vulkan_dep = declare_dependency(
   dependencies: [vulkan_headers_dep, vulkan_lib]
 )
-meson.override_dependency('vulkan', vulkan_dep)
+#meson.override_dependency('vulkan', vulkan_dep)
 
   vulkan_utility_libraries_sp = subproject('vulkan-utility-libraries')
   dep_vulkan_utility_libraries = vulkan_utility_libraries_sp.get_variable('vulkan_utility_libraries_dep')

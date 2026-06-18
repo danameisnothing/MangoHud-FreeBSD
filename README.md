@@ -1,3 +1,40 @@
+## TODO FreeBSD
+dependencies : meson, python3, py311-mako, gcc, glslang
+You need GCC for std::atomic<std::shared_ptr>. Clang doesn't support it in C++20? See https://stackoverflow.com/questions/67436535/stdatomicstdshared-ptrt-is-not-working-in-c20
+I haven't developed mangohud-next yet, so for now, build with -Dwith_mangohud_next=false
+
+Example build :
+```
+CC=gcc CXX=g++ meson build -Dwith_nvml=enabled -Dwith_xnvctrl=disabled -Dwith_x11=enabled -Dwith_wayland=disabled -Dwith_dbus=enabled -Dwith_mangohud_next=false
+```
+Rebuild :
+```
+CC=gcc CXX=g++ meson setup --reconfigure build -Dwith_nvml=enabled -Dwith_xnvctrl=disabled -Dwith_x11=enabled -Dwith_wayland=disabled -Dwith_dbus=enabled -Dwith_mangohud_next=false
+```
+
+On finish, you may encounter a message : `ld-elf.so.1: Cannot open "/usr/local/$LIB/mangohud/libMangoHud_shim.so"`
+Open up the `mangohud` shell script on PATH, and replace `\$LIB` with `lib` or `lib32`, depending on your arch.
+
+Old:
+sudo pkg install libsysinfo
+I forgot what that's for, though.
+
+For building manually, PLEASE run ninja -C build install. That install part is IMPORTANT! otherwise, only very simple programs will work! You have been warned!
+meson build -Dwith_nvml=enabled -Dwith_xnvctrl=disabled -Dwith_x11=enabled -Dwith_wayland=disabled -Dwith_dbus=enabled
+
+NOTE!
+I don't have XNVCtrl enabled, so the #ifdef guards checking HAVE_XNVCTRL won't be compiled. I did NOT modify the functions in HAVE_XNVCTRL! Do not be surprised if they lead to broken behaviour!
+
+My patches for GPU are inadequate, they only work for Nvidia.
+
+building instruction in my case :
+```
+sudo pkg install glslang
+sudo pkg install libxkbcommon
+sudo pkg install libglvnd mesa-libs
+
+pkg install nvidia-settings for NVCtrl.h
+
 # MangoHud
 
 A Vulkan and OpenGL overlay for monitoring FPS, temperatures, CPU/GPU load and more.

@@ -26,6 +26,9 @@ static void get_real_functions()
 #if defined(__GLIBC__)
         "*libdl.so*",
 #endif
+#ifdef __FreeBSD__
+        "*/libexec/ld-elf.so.*", // for functions to resolve properly, thank you Gemini 3 Pro Preview and Claude 4.5 Sonnet, 6 months ago.
+#endif
         "*libc.so*",
         "*libc.*.so*",
         "*ld-musl-*.so*",

@@ -120,11 +120,17 @@ static void loadMangoHud() {
 
     if (!mangoHudLoaded)
     {
-        handle = dlopen("${ORIGIN}/libMangoHud_opengl.so", RTLD_NOW | RTLD_LOCAL | RTLD_DEEPBIND);
+        // absolute nasty hack, this doesn't even account for lib and lib32 arches
+#ifdef __FreeBSD__
+        const char* pth = "/usr/local/lib/mangohud/libMangoHud_opengl.so";   
+#elif
+        const char* pth = "${ORIGIN}/libMangoHud_opengl.so";
+#endif
+        handle = dlopen(pth, RTLD_NOW | RTLD_LOCAL | RTLD_DEEPBIND);
         if (handle) mangoHudLoaded = true;
         else
         {
-            fprintf(stderr, "shim: Failed to load from ${ORIGIN}/libMangoHud_opengl.so: %s\n", dlerror());
+            fprintf(stderr, "shim: Failed to load from %s: %s\n", pth, dlerror());
             handle = RTLD_NEXT;
         }
     }
