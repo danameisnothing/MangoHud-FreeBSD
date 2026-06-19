@@ -54,3 +54,4 @@ subprojects/vkroots
 **/GTAGS
 
 .wraplock
+.cache

@@ -301,7 +301,9 @@ bool CPUStats::UpdateCoreMhz() {
     m_coreMhz.clear();
     // Unfortunately, I haven't found any way to get the real CPU clock speed, without a program running with elevated privileges (Turbostat)
     // FIXME: this is commented out because my current method relies on an external privileged program running turbostat to extract CPU clock. there are no good ways to easily integrate this without giving MangoHud privileged access
-#ifndef __FreeBSD__
+#ifdef __FreeBSD__
+    SPDLOG_WARN("*BSD: UpdateCoreMhz() is currently not implemented. May be re-implemented with mangohud-next");
+#else
     FILE *fp;
     static bool scaling_freq = true;
     if (scaling_freq){
@@ -379,7 +381,7 @@ bool CPUStats::UpdateCpuTemp() {
     }
 
     int temp = 0;
-    SPDLOG_DEBUG("hit branch for updating CPU temp");
+    SPDLOG_TRACE("hit branch for updating CPU temp");
     bool ret = ReadcpuTempFile(temp);
     m_cpuDataTotal.temp = temp;
 

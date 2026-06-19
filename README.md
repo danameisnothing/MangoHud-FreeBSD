@@ -36,6 +36,7 @@ sudo pkg install libxkbcommon
 sudo pkg install libglvnd mesa-libs
 
 pkg install nvidia-settings for NVCtrl.h
+```
 
 # MangoHud
 
