@@ -1,24 +1,30 @@
 #include "gpu.h"
 #include "file_utils.h"
 #include "hud_elements.h"
+#include "logging.h"
+#include "string_utils.h"
 
 namespace fs = ghc::filesystem;
-
-#ifdef __FreeBSD__
-    static const std::string basepth = "/dev/";
-#else
-    static const std::string basepth = "/sys/class/drm";
-#endif
-
 
 GPUS::GPUS(const overlay_params* early_params) {
     std::set<std::string> gpu_entries;
     auto params = early_params ? early_params : get_params().get();
 
-    // HACKHACK: FALLBACK! My system doesn't have /dev/dri!
-    //if (fs::is_directory(basepth))
-
-    for (const auto& entry : fs::directory_iterator(basepth)) {
+    // My system doesn't have /dev/dri, so we abandon the DRI check lol.
+    // there certainly are some setups where /dev/dri is present, my system is just bodged together.
+#ifdef __FreeBSD__
+    // FIXME: this doesn't account for multiple drmnX entries!
+    // thanks Claude 4.6 Sonnet for devinfo
+    // https://github.com/asdf-vm/asdf/issues/1046
+    unsigned long long drmns_indt = std::stoull(exec("devinfo -rv | grep -E '[[:blank:]]+drmn[[:digit:]]+' | sed -E \"s/drmn[[:digit:]]+//\" | wc -c | xargs | sed 's/$/-1/' | bc"));
+    // you need to do this in C++?
+    std::string drv_cmd = std::format("devinfo -rv | grep -oE '^[[:blank:]]{{{}}}[[:alpha:]]+[[:digit:]]+' | xargs | grep -oE \"drmn[[:digit:]]+[[:blank:]][[:alnum:]]+\" | sed -E \"s/drmn[[:digit:]]+[[:blank:]]//\"", drmns_indt);
+    std::string dev_name = exec(drv_cmd);
+    trim(dev_name);
+    SPDLOG_DEBUG("*BSD: num_drmns: {}, dev_name: {}, cmd: {}", drmns_indt, dev_name, drv_cmd);
+    gpu_entries.insert(dev_name);
+#else
+    for (const auto& entry : fs::directory_iterator("/sys/class/drm")) {
         if (!entry.is_directory())
             continue;
 
@@ -33,6 +39,7 @@ GPUS::GPUS(const overlay_params* early_params) {
             }
         }
     }
+#endif
 
     // Now process the sorted GPU entries
     uint8_t idx = 0, total_active = 0;
@@ -58,7 +65,21 @@ GPUS::GPUS(const overlay_params* early_params) {
             }
         }
 
-        std::string path = basepth + "/" + node_name;
+#ifdef __FreeBSD__
+        // I'm hoping that it stays as vgapciX, even when graphics drivers are loaded
+        unsigned long long graphics_id = std::stoull(exec(std::format("echo \"{}\" | grep -oE \"[[:digit:]]+\"", node_name)));
+        std::string vnd = exec(std::format("devinfo -rv | grep -E 'vgapci{}' | xargs | grep -oE '[[:blank:]]vendor=0x[[:alnum:]]+' | xargs | sed -E 's/vendor=//'", graphics_id));
+        std::string dev = exec(std::format("devinfo -rv | grep -E 'vgapci{}' | xargs | grep -oE '[[:blank:]]device=0x[[:alnum:]]+' | xargs | sed -E 's/device=//'", graphics_id));
+        std::string pci_tmp = exec(std::format("devinfo -rv | grep -E 'vgapci{}' | xargs | grep -oE '[[:blank:]]dbsf=pci.+' | xargs | sed -E 's/dbsf=pci//' ", graphics_id));
+        trim(vnd);
+        trim(dev);
+        trim(pci_tmp);
+        uint32_t vendor_id = std::stoul(vnd, nullptr, 16);
+        uint32_t device_id = std::stoul(dev, nullptr, 16);
+        const char* pci_dev = pci_tmp.c_str();
+        SPDLOG_DEBUG("*BSD: vnd: {}, dev: {}, pci_dev: {}, vendor_id: {:x}, device_id: {:x}", vnd, dev, pci_tmp, vendor_id, device_id);
+#else
+        std::string path = "/sys/class/drm/" + node_name;
         std::string device_address = get_pci_device_address(path);  // Store the result
         const char* pci_dev = device_address.c_str();
 
@@ -79,6 +100,7 @@ GPUS::GPUS(const overlay_params* early_params) {
                 SPDLOG_ERROR("stoul failed on: {}", "/sys/bus/pci/devices/" + device_address + "/device");
             }
         }
+#endif
 
         std::shared_ptr<GPU> ptr =
             std::make_shared<GPU>(node_name, vendor_id, device_id, pci_dev, driver);
@@ -125,7 +147,14 @@ GPUS::GPUS(const overlay_params* early_params) {
 }
 
 std::string GPUS::get_driver(const std::string& node) {
-    std::string path = basepth + "/" + node + "/device/driver";
+#ifdef __FreeBSD__
+    // not very performant (probably)
+    std::string fmt_cmd = std::format("echo \"{}\" | sed -E \"s/[[:digit:]]//\"", node);
+    std::string res = exec(fmt_cmd);
+    trim(res);
+    return res;
+#else
+    std::string path = "/sys/class/drm/" + node + "/device/driver";
 
     if (!fs::exists(path)) {
         SPDLOG_ERROR("{} doesn't exist", path);
@@ -141,6 +170,7 @@ std::string GPUS::get_driver(const std::string& node) {
     driver = driver.substr(driver.rfind("/") + 1);
 
     return driver;
+#endif
 }
 
 std::string GPUS::get_pci_device_address(const std::string& drm_card_path) {

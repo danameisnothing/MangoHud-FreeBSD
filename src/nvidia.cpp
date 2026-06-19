@@ -37,6 +37,7 @@ NVIDIA::NVIDIA(const char* pciBusId) {
             nvml_available = true; // NVML initialized successfully
             if (pciBusId) {
                 result = nvml->nvmlDeviceGetHandleByPciBusId_v2(pciBusId, &device);
+                // FIXME: with our current pciBusId format, this path fails!
                 if (NVML_SUCCESS != result) {
                     SPDLOG_ERROR("Getting device handle by PCI bus ID failed: {}", nvml->nvmlErrorString(result));
                     nvml_available = false; // Revert if getting device handle fails
