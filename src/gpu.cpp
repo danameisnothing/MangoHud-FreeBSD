@@ -76,7 +76,16 @@ GPUS::GPUS(const overlay_params* early_params) {
         trim(pci_tmp);
         uint32_t vendor_id = std::stoul(vnd, nullptr, 16);
         uint32_t device_id = std::stoul(dev, nullptr, 16);
-        const char* pci_dev = pci_tmp.c_str();
+        // convert it into a format NVML can understand
+        std::stringstream ss(pci_tmp);
+        std::string tok;
+        std::vector<unsigned int> data;
+        while (std::getline(ss, tok, ':')) {
+            data.push_back(std::stoul(tok, nullptr, 16));
+        }
+        // format conversion from Gemini 3.5 Flash (high)
+        std::string pci_nvml_tmp = std::format("{:08x}:{:02x}:{:02x}.{:x}", data[0], data[1], data[2], data[3]);
+        const char* pci_dev = pci_nvml_tmp.c_str();
         SPDLOG_DEBUG("*BSD: vnd: {}, dev: {}, pci_dev: {}, vendor_id: {:x}, device_id: {:x}", vnd, dev, pci_tmp, vendor_id, device_id);
 #else
         std::string path = "/sys/class/drm/" + node_name;
