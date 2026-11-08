@@ -27,6 +27,12 @@ static void get_real_functions()
 #if defined(__GLIBC__)
         "*libdl.so*",
 #endif
+// Upstream on https://github.com/flightlessmango/MangoHud/commit/8bd15ed92667a31427af2c219bc8d2847702f274 deleted real_dlsym.c
+// on the "legacy" version of MangoHud, and now uses real_dlsym.c at mangohud-next, which I never patched before.
+// Now, we duplicate my previous patch
+#ifdef __FreeBSD__
+        "*/libexec/ld-elf.so.*", // for functions to resolve properly, thank you Gemini 3 Pro Preview and Claude 4.5 Sonnet, 6 months ago.
+#endif
         "*libc.so*",
         "*libc.*.so*",
         "*ld-musl-*.so*",
