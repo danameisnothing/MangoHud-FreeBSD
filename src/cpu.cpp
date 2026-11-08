@@ -208,8 +208,6 @@ bool CPUStats::UpdateCPUData()
     // FIXME: INCOMPLETE HACK!
     unsigned long long int usertime = 0, nicetime = 0, systemtime = 0, idletime = 0;
     unsigned long long int ioWait = 0, irq = 0, softIrq = 0, steal = 0, guest = 0, guestnice = 0;
-    int cpuid = -1;
-    size_t cpu_count = 0;
 
     if (!m_inited)
         return false;
@@ -249,6 +247,8 @@ bool CPUStats::UpdateCPUData()
     }
     return true;
 #else
+    int cpuid = -1;
+    size_t cpu_count = 0;
     std::string line;
     std::ifstream file (PROCSTATFILE);
     bool ret = false;
@@ -666,6 +666,7 @@ static bool find_input(const std::string& path, const char* input_prefix, std::s
     return false;
 }
 
+#ifndef __FreeBSD__
 static bool find_fallback_input(const std::string& path, const char* input_prefix, std::string& input)
 {
     auto files = ls(path.c_str(), input_prefix, LS_FILES);
@@ -739,6 +740,7 @@ static void find_cpu_thermal_zones(std::vector<std::string>& inputs) {
 
     std::sort(inputs.begin(), inputs.end());
 }
+#endif
 
 bool CPUStats::GetCpuFile() {
     if (m_cpuTempFile || !m_cpuTempFiles.empty())
