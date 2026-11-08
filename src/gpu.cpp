@@ -1,3 +1,4 @@
+#include <set>
 #include "gpu.h"
 #include "file_utils.h"
 #include "hud_elements.h"
@@ -7,6 +8,7 @@
 namespace fs = ghc::filesystem;
 
 GPUS::GPUS(const overlay_params* early_params) {
+    std::error_code ec;
     std::set<std::string> gpu_entries;
     auto params = early_params ? early_params : get_params().get();
 
@@ -24,8 +26,11 @@ GPUS::GPUS(const overlay_params* early_params) {
     SPDLOG_DEBUG("*BSD: num_drmns: {}, dev_name: {}, cmd: {}", drmns_indt, dev_name, drv_cmd);
     gpu_entries.insert(dev_name);
 #else
-    for (const auto& entry : fs::directory_iterator("/sys/class/drm")) {
-        if (!entry.is_directory())
+    std::error_code iterator_ec;
+    for (fs::directory_iterator it("/sys/class/drm", iterator_ec), end;
+         !iterator_ec && it != end; it.increment(iterator_ec)) {
+        const auto& entry = *it;
+        if (!entry.is_directory(ec))
             continue;
 
         std::string node_name = entry.path().filename().string();
@@ -39,6 +44,8 @@ GPUS::GPUS(const overlay_params* early_params) {
             }
         }
     }
+    if (iterator_ec)
+        SPDLOG_DEBUG("Failed to iterate {}: {}", fs::path("/sys/class/drm").string(), iterator_ec.message());
 #endif
 
     // Now process the sorted GPU entries
@@ -128,7 +135,7 @@ GPUS::GPUS(const overlay_params* early_params) {
         );
 
         if (ptr->is_active) {
-            SPDLOG_INFO(
+            SPDLOG_DEBUG(
                 "Set {} as active GPU (driver={} id={:x}:{:x} pci_dev={})",
                 node_name, driver, vendor_id, device_id, pci_dev
             );
@@ -155,6 +162,13 @@ GPUS::GPUS(const overlay_params* early_params) {
 
 }
 
+bool GPU::is_steam_frame() {
+    if (driver != "msm_dpu" && driver != "msm_drm")
+        return false;
+
+    return drm_node_is_steam_frame(drm_node);
+}
+
 std::string GPUS::get_driver(const std::string& node) {
 #ifdef __FreeBSD__
     // not very performant (probably)
@@ -163,19 +177,22 @@ std::string GPUS::get_driver(const std::string& node) {
     trim(res);
     return res;
 #else
+    std::error_code ec;
     std::string path = "/sys/class/drm/" + node + "/device/driver";
 
-    if (!fs::exists(path)) {
+    if (!fs::exists(path, ec)) {
         SPDLOG_ERROR("{} doesn't exist", path);
         return "";
     }
 
-    if (!fs::is_symlink(path)) {
+    if (!fs::is_symlink(path, ec)) {
         SPDLOG_ERROR("{} is not a symlink (it should be)", path);
         return "";
     }
 
-    std::string driver = fs::read_symlink(path).string();
+    std::string driver = fs::read_symlink(path, ec).string();
+    if (ec)
+        return "";
     driver = driver.substr(driver.rfind("/") + 1);
 
     return driver;
@@ -183,8 +200,11 @@ std::string GPUS::get_driver(const std::string& node) {
 }
 
 std::string GPUS::get_pci_device_address(const std::string& drm_card_path) {
+    std::error_code ec;
     // /sys/class/drm/renderD128/device/subsystem -> /sys/bus/pci
-    auto subsystem = fs::canonical(drm_card_path + "/device/subsystem").string();
+    auto subsystem = fs::canonical(drm_card_path + "/device/subsystem", ec).string();
+    if (ec)
+        return "";
     auto idx = subsystem.rfind("/") + 1; // /sys/bus/pci
                                          //         ^
                                          //         |- find this guy
@@ -192,7 +212,9 @@ std::string GPUS::get_pci_device_address(const std::string& drm_card_path) {
         return "";
 
     // /sys/class/drm/renderD128/device -> /sys/devices/pci0000:00/0000:00:01.0/0000:01:00.0/0000:02:01.0/0000:03:00.0
-    auto pci_addr = fs::read_symlink(drm_card_path + "/device").string();
+    auto pci_addr = fs::read_symlink(drm_card_path + "/device", ec).string();
+    if (ec)
+        return "";
     idx = pci_addr.rfind("/") + 1; // /sys/.../0000:03:00.0
                                    //         ^
                                    //         |- find this guy

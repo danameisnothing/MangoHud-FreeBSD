@@ -6,13 +6,13 @@
 #include <atomic>
 #include <string_view>
 #include "../config.h"
-#include "gpu/gpu.hpp"
+#include "gpu/gpus.hpp"
 #include "cpu/cpu.hpp"
 #include "exec.h"
 #include "../../ipc/ipc.h"
 #include "../../render/colors.h"
 
-using MetricValue = std::variant<int, float, std::vector<float>, std::string>;
+using MetricValue = std::variant<int, uint64_t, float, std::vector<float>, std::string>;
 struct Metric {
     std::optional<MetricValue> val;
     std::string unit;
@@ -26,8 +26,10 @@ public:
     void update();
     Metric get(const char* a, const char* b, const pid_t pid);
     void update_table();
-    void populate_tables();
     void update_client();
+    void add_client_pid(pid_t pid);
+    std::string system_json_snapshot();
+    std::string clients_json_snapshot();
     std::vector<std::shared_ptr<GPU>> available_gpus() const { return gpus.available(); }
 
     ~Metrics() {
@@ -52,6 +54,7 @@ private:
     MetricTable metrics;
     MetricTable client_metrics;
 
+    void populate_tables(const std::vector<std::shared_ptr<Client>>& clients);
     void assign_values(hudTable* t, pid_t pid, hudTable* render_table);
     void format_into(std::string& dst, const char* fmt, ...) const;
     std::string engine_name(const std::string& engine) ;

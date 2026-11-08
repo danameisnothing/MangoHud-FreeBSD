@@ -85,12 +85,8 @@ static ImVec4 SRGBtoBT2020(ImVec4 col)
         {0.0, 0.0, 0.0, 1.0}
     };
 
-    col.x = dot(to2020[0], col);
-    col.y = dot(to2020[1], col);
-    col.z = dot(to2020[2], col);
-    col.w = dot(to2020[3], col);
-
-    return col;
+    return ImVec4(dot(to2020[0], col), dot(to2020[1], col),
+                  dot(to2020[2], col), dot(to2020[3], col));
 }
 
 static ImVec4 LinearToPQ(ImVec4 col)
@@ -451,6 +447,25 @@ void HudElements::cpu_stats(){
             HUDElements.TextColored(HUDElements.colors.text, "%%");
         }
 
+        if (HUDElements.params->enabled[OVERLAY_PARAM_ENABLED_cpu_max_core_load]){
+            ImguiNextColumnOrNewRow();
+            int max_core_load = int(cpuStats.GetCPUDataTotal().max_core_load);
+            auto load_color = text_color;
+            if (HUDElements.params->enabled[OVERLAY_PARAM_ENABLED_cpu_load_change]){
+                struct LOAD_DATA cpu_data = {
+                    HUDElements.colors.cpu_load_low,
+                    HUDElements.colors.cpu_load_med,
+                    HUDElements.colors.cpu_load_high,
+                    HUDElements.params->cpu_load_value[0],
+                    HUDElements.params->cpu_load_value[1]
+                };
+                load_color = change_on_load_temp(cpu_data, max_core_load);
+            }
+            right_aligned_text(load_color, HUDElements.ralign_width, "%d", max_core_load);
+            ImGui::SameLine(0, 1.0f);
+            HUDElements.TextColored(load_color, "%%");
+        }
+
         if (HUDElements.params->enabled[OVERLAY_PARAM_ENABLED_cpu_temp]){
             ImguiNextColumnOrNewRow();
             if (HUDElements.params->enabled[OVERLAY_PARAM_ENABLED_temp_fahrenheit])
@@ -753,7 +768,7 @@ void HudElements::proc_vram() {
 void HudElements::ram(){
 #if defined(__linux__)  || defined(__FreeBSD__)
     if (HUDElements.params->enabled[OVERLAY_PARAM_ENABLED_ram] ||
-        HUDElements.params->enabled[OVERLAY_PARAM_ENABLED_ram_temp]) {
+        (HUDElements.params->enabled[OVERLAY_PARAM_ENABLED_ram_temp] && mem_temp > -1)) {
         ImguiNextColumnFirstItem();
         HUDElements.TextColored(HUDElements.colors.ram, "RAM");
     }
@@ -778,7 +793,7 @@ void HudElements::ram(){
         ImGui::PopFont();
     }
 
-    if (HUDElements.params->enabled[OVERLAY_PARAM_ENABLED_ram_temp]) {
+    if (HUDElements.params->enabled[OVERLAY_PARAM_ENABLED_ram_temp] && mem_temp > -1) {
         ImguiNextColumnOrNewRow();
         if (HUDElements.params->enabled[OVERLAY_PARAM_ENABLED_temp_fahrenheit])
             right_aligned_text(HUDElements.colors.text, HUDElements.ralign_width, "%i", HUDElements.convert_to_fahrenheit(mem_temp));
@@ -829,6 +844,26 @@ void HudElements::procmem()
         HUDElements.TextColored(HUDElements.colors.text, "%s", unit);
         ImGui::PopFont();
     }
+#endif
+}
+
+void HudElements::cgroup_mem()
+{
+#ifdef __linux__
+    const char* unit = nullptr;
+    uint64_t used = cgroup_mem_used;
+
+    if (!HUDElements.params->enabled[OVERLAY_PARAM_ENABLED_cgroup_mem] || !used)
+        return;
+
+    ImguiNextColumnFirstItem();
+    HUDElements.TextColored(HUDElements.colors.ram, "CGROUP");
+    ImguiNextColumnOrNewRow();
+    right_aligned_text(HUDElements.colors.text, HUDElements.ralign_width, "%.1f", format_units(used, unit));
+    ImGui::SameLine(0, 1.0f);
+    ImGui::PushFont(HUDElements.sw_stats->font_small);
+    HUDElements.TextColored(HUDElements.colors.text, "%s", unit);
+    ImGui::PopFont();
 #endif
 }
 
@@ -1305,7 +1340,7 @@ void HudElements::gamescope_fsr(){
         ImguiNextColumnFirstItem();
         string FSR_TEXT;
         ImVec4 FSR_COLOR;
-        if (HUDElements.g_fsrUpscale){
+        if (HUDElements.g_upscaling){
             FSR_TEXT = "ON";
             FSR_COLOR = HUDElements.colors.fps_value_high;
         } else {
@@ -1313,10 +1348,10 @@ void HudElements::gamescope_fsr(){
             FSR_COLOR = HUDElements.colors.fps_value_low;
         }
 
-        HUDElements.TextColored(HUDElements.colors.engine, "%s", "FSR");
+        HUDElements.TextColored(HUDElements.colors.engine, "%s", HUDElements.g_wantedUpscaler.c_str());
         ImguiNextColumnOrNewRow();
         right_aligned_text(FSR_COLOR, HUDElements.ralign_width, "%s", FSR_TEXT.c_str());
-        if (HUDElements.g_fsrUpscale){
+        if (HUDElements.g_upscalerSharpens){
             if (!HUDElements.params->enabled[OVERLAY_PARAM_ENABLED_hide_fsr_sharpness]) {
                 ImguiNextColumnOrNewRow();
                 right_aligned_text(HUDElements.colors.text, HUDElements.ralign_width, "%i", HUDElements.g_fsrSharpness);
@@ -1460,7 +1495,11 @@ void HudElements::frame_count(){
 }
 
 void HudElements::fan(){
-    if (HUDElements.params->enabled[OVERLAY_PARAM_ENABLED_fan] && fan_speed != -1) {
+    if (!HUDElements.params->enabled[OVERLAY_PARAM_ENABLED_fan])
+        return;
+
+    int fan_speed = cpuStats.GetPlatformFanSpeed();
+    if (fan_speed != -1) {
         ImguiNextColumnFirstItem();
         HUDElements.TextColored(HUDElements.colors.engine, "%s", "FAN");
         ImguiNextColumnOrNewRow();
@@ -1676,12 +1715,16 @@ void HudElements::hdr() {
 }
 
 void HudElements::refresh_rate() {
-    if (HUDElements.refresh > 0) {
+    if (HUDElements.refresh > 0 || HUDElements.scanout_refresh > 0) {
         ImGui::PushFont(HUDElements.sw_stats->font_secondary);
         ImguiNextColumnFirstItem();
         HUDElements.TextColored(HUDElements.colors.engine, "%s", "Display Hz");
         ImguiNextColumnOrNewRow();
-        right_aligned_text(HUDElements.colors.text, HUDElements.ralign_width, "%i", HUDElements.refresh);
+        // gamescope measures the panel's real rate, which VRR moves away from the mode's.
+        if (HUDElements.scanout_refresh > 0)
+            right_aligned_text(HUDElements.colors.text, HUDElements.ralign_width, "%.1f", HUDElements.scanout_refresh);
+        else
+            right_aligned_text(HUDElements.colors.text, HUDElements.ralign_width, "%i", HUDElements.refresh);
         ImGui::PopFont();
     }
 }
@@ -1783,6 +1826,12 @@ void HudElements::fex_stats()
         return;
     }
 
+    auto status = fex::get_fex_status();
+    if (!status) {
+        // If FEX isn't found then status won't be set. Skip displaying anything.
+        return;
+    }
+
     ImGui::PushFont(HUDElements.sw_stats->font_small);
 
     if (HUDElements.params->fex_stats.status) {
@@ -1791,7 +1840,7 @@ void HudElements::fex_stats()
         ImguiNextColumnOrNewRow();
         ImGui::Dummy(ImVec2(0.0f, real_font_size.y));
         ImguiNextColumnOrNewRow();
-        right_aligned_text(HUDElements.colors.text, HUDElements.ralign_width, "%s", fex::fex_status);
+        right_aligned_text(HUDElements.colors.text, HUDElements.ralign_width, "%s", status);
     }
 
     if (!fex::is_fex_pid_found()) {
@@ -1965,6 +2014,7 @@ void HudElements::sort_elements(const std::pair<std::string, std::string>& optio
         {"arch", {arch}},
         {"wine", {wine}},
         {"procmem", {procmem}},
+        {"cgroup_mem", {cgroup_mem}},
         {"gamemode", {gamemode}},
         {"vkbasalt", {vkbasalt}},
         {"engine_version", {engine_version}},
@@ -2062,6 +2112,8 @@ void HudElements::legacy_elements(const overlay_params* temp_params){
         ordered_functions.push_back({ram, "ram", value});
     if (temp_params->enabled[OVERLAY_PARAM_ENABLED_procmem])
         ordered_functions.push_back({procmem, "procmem", value});
+    if (temp_params->enabled[OVERLAY_PARAM_ENABLED_cgroup_mem])
+        ordered_functions.push_back({cgroup_mem, "cgroup_mem", value});
     if (!temp_params->network.empty())
         ordered_functions.push_back({network, "network", value});
     if (temp_params->enabled[OVERLAY_PARAM_ENABLED_battery])

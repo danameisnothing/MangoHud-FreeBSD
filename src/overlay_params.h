@@ -58,6 +58,7 @@ struct Tracepoint;
    OVERLAY_PARAM_BOOL(procmem)                       \
    OVERLAY_PARAM_BOOL(procmem_shared)                \
    OVERLAY_PARAM_BOOL(procmem_virt)                  \
+   OVERLAY_PARAM_BOOL(cgroup_mem)                    \
    OVERLAY_PARAM_BOOL(time)                          \
    OVERLAY_PARAM_BOOL(full)                          \
    OVERLAY_PARAM_BOOL(read_cfg)                      \
@@ -80,6 +81,7 @@ struct Tracepoint;
    OVERLAY_PARAM_BOOL(graphs)                        \
    OVERLAY_PARAM_BOOL(legacy_layout)                 \
    OVERLAY_PARAM_BOOL(cpu_mhz)                       \
+   OVERLAY_PARAM_BOOL(cpu_max_core_load)             \
    OVERLAY_PARAM_BOOL(frametime)                     \
    OVERLAY_PARAM_BOOL(frame_count)                   \
    OVERLAY_PARAM_BOOL(resolution)                    \

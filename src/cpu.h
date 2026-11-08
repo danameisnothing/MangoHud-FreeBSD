@@ -45,6 +45,7 @@ typedef struct CPUData_ {
    int mhz;
    int temp;
    int cpu_mhz;
+   float max_core_load;
    float power;
 
    std::string label = "unknown";
@@ -56,7 +57,8 @@ enum {
    CPU_POWER_ZENERGY,
    CPU_POWER_RAPL,
    CPU_POWER_AMDGPU,
-   CPU_POWER_XGENE
+   CPU_POWER_XGENE,
+   CPU_POWER_DECKARD
 };
 
 struct CPUPowerData {
@@ -162,6 +164,12 @@ struct CPUPowerData_xgene : public CPUPowerData {
    FILE* powerFile {nullptr};
 };
 
+struct CPUPowerData_deckard : public CPUPowerData {
+   CPUPowerData_deckard() {
+      this->source = CPU_POWER_DECKARD;
+   };
+};
+
 class CPUStats
 {
 public:
@@ -178,10 +186,12 @@ public:
    bool UpdateCoreMhz();
    bool UpdateCpuTemp();
    bool UpdateCpuPower();
+   bool UpdatePlatformFanSpeed();
    bool ReadcpuTempFile(int& temp);
    bool GetCpuFile();
    bool InitCpuPowerData();
    double GetCPUPeriod() { return m_cpuPeriod; }
+   int GetPlatformFanSpeed() const { return m_platformFanSpeed; }
    void get_cpu_cores_types();
    void get_cpu_cores_types_intel();
    void get_cpu_cores_types_arm();
@@ -201,7 +211,13 @@ private:
    bool m_updatedCPUs = false; // TODO use caching or just update?
    bool m_inited = false;
    FILE *m_cpuTempFile = nullptr;
+   std::vector<FILE*> m_cpuTempFiles;
+   FILE *m_platformFanFile = nullptr;
+   int m_platformFanDivisor = 1;
+   int m_platformFanSpeed = -1;
    std::unique_ptr<CPUPowerData> m_cpuPowerData;
+
+   bool GetPlatformFanFile();
 
    const std::map<std::string, std::string> intel_cores = {
       {"P", "/sys/devices/cpu_core/cpus"},

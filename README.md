@@ -1,5 +1,5 @@
 ## TODO FreeBSD
-dependencies : meson, python3, py311-mako, gcc, glslang
+dependencies : meson, python3, py311-mako, gcc, glslang, pkgconf
 You need GCC for std::atomic<std::shared_ptr>. Clang doesn't support it in C++20? See https://stackoverflow.com/questions/67436535/stdatomicstdshared-ptrt-is-not-working-in-c20
 I haven't developed mangohud-next yet, so for now, build with -Dwith_mangohud_next=false
 
@@ -118,7 +118,7 @@ Install necessary development packages.
 - GBM (libgbm-dev)
 - libdrm (libdrm-dev)
 - libcap (libcap-dev)
-- libsystemd (libsystemd-dev)
+- sd-bus (libsystemd-dev, or elogind on non-systemd distributions)
 - yaml-cpp (libyaml-cpp-dev)
 - X11 (libx11-dev)
 - XNVCtrl (libxnvctrl-dev), optional, use `-Dwith_xnvctrl=disabled` option with `meson` to disable
@@ -359,7 +359,9 @@ If you start the game from the terminal with MangoHud enabled (for example by st
 
 You can find an example config in /usr/share/doc/mangohud
 
-[GOverlay](https://github.com/benjamimgois/goverlay) is a GUI application that can be used to manage the config
+[GOverlay](https://github.com/benjamimgois/goverlay) Qt GUI for configuring MangoHud.
+
+[MangoJuice](https://github.com/radiolamp/mangojuice) GTK GUI for configuring MangoHud.
 
 ---
 
@@ -392,6 +394,7 @@ Parameters that are enabled by default have to be explicitly disabled. These (cu
 | `bicubic`                          | Force bicubic filtering                                                               |
 | `blacklist`                        | Add a program to the blacklist. e.g `blacklist=vkcube,WatchDogs2.exe`                 |
 | `cellpadding_y`                    | Set the vertical cellpadding, default is `-0.085` |
+| `cgroup_mem`                       | Display memory used by the app's cgroup when it runs in a systemd app unit (`app.slice/app-*`). It includes everything in that cgroup, such as the launcher if they share one: anon + shmem, which includes GPU buffers on shmem-backed drivers (e.g. msm, i915 iGPU) but not TTM ones (e.g. amdgpu) |
 | `control=`                         | Sets up a unix socket with a specific name that can be connected to with mangohud-control.<br>I.e. `control=mangohud` or `control=mangohud-%p` (`%p` will be replaced by process id)    |
 | `core_load_change`                 | Change the colors of cpu core loads, uses the same data from `cpu_load_value` and `cpu_load_change` |
 | `core_load`                        | Display load & frequency per core                                                     |
@@ -401,6 +404,7 @@ Parameters that are enabled by default have to be explicitly disabled. These (cu
 | `cpu_load_color`                   | Set the colors for the gpu load change low, medium and high. e.g `cpu_load_color=0000FF,00FFFF,FF00FF` |
 | `cpu_load_value`                   | Set the values for medium and high load e.g `cpu_load_value=50,90`                    |
 | `cpu_mhz`                          | Show the CPUs current MHz                                                             |
+| `cpu_max_core_load`                | Display the load of the busiest CPU core next to the CPU load, colored by `cpu_load_change` |
 | `cpu_power`<br>`gpu_power`         | Display CPU/GPU draw in watts                                                         |
 | `cpu_temp`<br>`gpu_temp`<br>`gpu_junction_temp`<br>`gpu_mem_temp`           | Display current CPU/GPU temperature                                                  |
 | `cpu_custom_temp_sensor`           | Use custom hwmon sensor for cpu temperature. e.g `cpu_custom_temp_sensor=cpuss0_2,temp3_input`.|
@@ -442,7 +446,7 @@ Parameters that are enabled by default have to be explicitly disabled. These (cu
 | `frame_count`                      | Display frame count                                                                   |
 | `frametime`                        | Display frametime next to FPS text                                                    |
 | `frame_timing_detailed`            | Display frame timing in a more detailed chart                                         |
-| `fsr`                              | Display the status of FSR (only works in gamescope)                                   |
+| `fsr`                              | Display the status of gamescope's upscaler (FSR, NIS, SGSR, etc.)                     |
 | `hdr`                              | Display the status of HDR (only works in gamescope)                                   |
 | `refresh_rate`                     | Display the current refresh rate (only works in gamescope)                            |
 | `full`                             | Enable most of the toggleable parameters (currently excludes `histogram`)             |
@@ -601,6 +605,7 @@ Example output:
 		<th colspan="2">Intel Discrete</th>
 		<th>Intel Integrated</th>
 		<th>Panfrost/Panthor driver</th>
+		<th colspan="2">Qualcomm</th>
 	</tr>
 	<tr>
 		<th></th>
@@ -610,9 +615,13 @@ Example output:
 		<th>xe</th>
 		<th>i915/xe</th>
 		<th></th>
+		<th>msm_drm (kgsl)</th>
+		<th>msm_dpu</th>
 	</tr>
 	<tr>
 		<td>Usage%</td>
+		<td>🟢</td>
+		<td>🟢</td>
 		<td>🟢</td>
 		<td>🟢</td>
 		<td>🟢</td>
@@ -628,11 +637,15 @@ Example output:
 		<td>🟢</td>
 		<td>🔴</td>
 		<td>🟢</td>
+		<td>🟢</td>
+		<td>🟢</td>
 	</tr>
 	<tr>
 		<td>Junction Temperature</td>
 		<td>🔴</td>
 		<td>🟢</td>
+		<td>🔴</td>
+		<td>🔴</td>
 		<td>🔴</td>
 		<td>🔴</td>
 		<td>🔴</td>
@@ -646,6 +659,8 @@ Example output:
 		<td>🟢</td>
 		<td>🔴</td>
 		<td>🔴</td>
+		<td>🔴</td>
+		<td>🔴</td>
 	</tr>
 	<tr>
 		<td>Process VRAM</td>
@@ -654,6 +669,8 @@ Example output:
 		<td>🟢</td>
 		<td>🟢</td>
 		<td>🟢</td>
+		<td>🟢</td>
+		<td>🔴</td>
 		<td>🟢</td>
 	</tr>
 	<tr>
@@ -664,9 +681,13 @@ Example output:
 		<td>🔴</td>
 		<td>🔴</td>
 		<td>🔴</td>
+		<td>🔴</td>
+		<td>🔴</td>
 	</tr>
 	<tr>
 		<td>Total VRAM</td>
+		<td>🟢</td>
+		<td>🟢</td>
 		<td>🟢</td>
 		<td>🟢</td>
 		<td>🔴</td>
@@ -682,6 +703,8 @@ Example output:
 		<td>🔴</td>
 		<td>🔴</td>
 		<td>🔴</td>
+		<td>🔴</td>
+		<td>🔴</td>
 	</tr>
 	<tr>
 		<td>Core Clock</td>
@@ -691,6 +714,8 @@ Example output:
 		<td>🟢</td>
 		<td>🟢</td>
 		<td>🟢</td>
+		<td>🟢</td>
+		<td>🔴</td>
 	</tr>
 	<tr>
 		<td>Power Usage</td>
@@ -698,6 +723,8 @@ Example output:
 		<td>🟢</td>
 		<td>🟢</td>
 		<td>🟢</td>
+		<td>🔴</td>
+		<td>🔴</td>
 		<td>🔴</td>
 		<td>🔴</td>
 	</tr>
@@ -709,6 +736,8 @@ Example output:
 		<td>🟢</td>
 		<td>🟢</td>
 		<td>🔴</td>
+		<td>🔴</td>
+		<td>🔴</td>
 	</tr>
 	<tr>
 		<td>Fan Speed</td>
@@ -718,6 +747,8 @@ Example output:
 		<td>🟢</td>
 		<td>🔴</td>
 		<td>🔴</td>
+		<td>🔴</td>
+		<td>🔴</td>
 	</tr>
 	<tr>
 		<td>Voltage</td>
@@ -725,6 +756,8 @@ Example output:
 		<td>🟢</td>
 		<td>🟢</td>
 		<td>🟢</td>
+		<td>🔴</td>
+		<td>🔴</td>
 		<td>🔴</td>
 		<td>🔴</td>
 	</tr>
@@ -743,3 +776,6 @@ Example output:
 #### Panfrost and Panthor notes
 - GPU usage requires `echo N | sudo tee /sys/class/drm/renderD*/device/profiling`
   - Where N is a number, 1 for panfrost and 3 for panthor.
+
+#### Qualcomm notes
+- GPU usage on `msm_dpu` shows usage of the current process, not total system usage
